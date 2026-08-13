@@ -12,4 +12,8 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Deploying to Netlify instead of the Lovable-sandbox default (Cloudflare).
+  nitro: {
+    preset: "netlify",
+  },
 });

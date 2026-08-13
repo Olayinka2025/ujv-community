@@ -21,7 +21,9 @@ const supabase = createClient(url, serviceKey, {
 const { data, error } = await supabase.auth.admin.listUsers({ perPage: 200 });
 if (error) throw error;
 
-const toDelete = data.users.filter((u) => /^(test|debug|dbg)[a-z0-9]*@example\.com$/i.test(u.email ?? ""));
+const toDelete = data.users.filter((u) =>
+  /^(test|debug|dbg|prodcheck)[a-z0-9]*@example\.com$/i.test(u.email ?? ""),
+);
 
 console.log(`Deleting ${toDelete.length} test/debug accounts:`);
 for (const user of toDelete) {
