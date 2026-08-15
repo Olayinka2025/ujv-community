@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Shell, useShell } from "@/components/community/Shell";
 import { Avatar } from "@/components/community/Avatar";
+import { PostCard } from "@/components/community/PostCard";
 import { useJoinSpace, useLeaveSpace, useSpaceMembers, useSpaces } from "@/lib/hooks/useSpaces";
 import { usePosts } from "@/lib/hooks/usePosts";
 import { useEvents } from "@/lib/hooks/useEvents";
-import { timeAgo, formatEventDate } from "@/lib/format";
-import { ArrowLeft, Heart, MessageSquare } from "lucide-react";
+import { formatEventDate } from "@/lib/format";
+import { ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/spaces_/$slug")({
   head: () => ({
@@ -88,25 +89,7 @@ function SpaceDetail() {
             </li>
           ) : null}
           {feed.map((post) => (
-            <li key={post.id} className="rounded-xl border border-border bg-card p-5">
-              <div className="flex items-center gap-3">
-                <Avatar name={post.author_name} size={36} />
-                <div className="text-sm">
-                  <p className="font-semibold leading-tight">{post.author_name}</p>
-                  <p className="text-muted-foreground">{timeAgo(post.created_at)} ago</p>
-                </div>
-              </div>
-              <h2 className="mt-3 text-lg font-semibold leading-snug">{post.title}</h2>
-              <p className="mt-2 leading-relaxed text-muted-foreground">{post.body}</p>
-              <div className="mt-4 flex gap-5 border-t border-border pt-3 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <Heart className="h-4 w-4" /> {post.like_count}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <MessageSquare className="h-4 w-4" /> 0
-                </span>
-              </div>
-            </li>
+            <PostCard key={post.id} post={post} showSpace={false} />
           ))}
         </ul>
 

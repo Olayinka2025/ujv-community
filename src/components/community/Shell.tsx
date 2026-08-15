@@ -1,10 +1,12 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import { Avatar } from "./Avatar";
 import { Logo } from "./Logo";
 import { useTheme } from "@/lib/client-prefs";
 import { useAuth } from "@/lib/auth";
 import { timeAgo } from "@/lib/format";
+import { createDailyRoom } from "@/lib/daily";
 import { useMembers } from "@/lib/hooks/useMembers";
 import { useSpaces } from "@/lib/hooks/useSpaces";
 import { useMarkNotificationsRead, useNotifications } from "@/lib/hooks/useNotifications";
@@ -15,6 +17,7 @@ import {
   useSendMessage,
 } from "@/lib/hooks/useChat";
 import {
+  ArrowLeft,
   Bell,
   Grid3x3,
   Home,
@@ -28,6 +31,8 @@ import {
   ChevronsUpDown,
   GraduationCap,
   MessageCircle,
+  ShieldCheck,
+  Video,
 } from "lucide-react";
 
 type ShellContextValue = { openChat: (userId?: string, name?: string) => void };
@@ -235,6 +240,20 @@ function ChatPanel({
   const sendMessage = useSendMessage();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [startingCall, setStartingCall] = useState(false);
+
+  const startVideoCall = async () => {
+    if (!activeId || startingCall) return;
+    setStartingCall(true);
+    try {
+      const room = await createDailyRoom();
+      await sendMessage.mutateAsync({ conversationId: activeId, body: `video-call::${room.url}` });
+    } catch {
+      toast.error("Couldn't start the video call.");
+    } finally {
+      setStartingCall(false);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -260,93 +279,171 @@ function ChatPanel({
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-foreground/25" onClick={onClose}>
       <div
-        className="flex h-full w-full max-w-md flex-col bg-card shadow-[var(--shadow-lift)]"
+        className="flex h-full w-full max-w-3xl bg-card shadow-[var(--shadow-lift)]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-          <MessageCircle className="h-5 w-5 text-primary" />
-          <p className="font-display text-base font-semibold">Chat</p>
-          <button
-            type="button"
-            aria-label="Close chat"
-            onClick={onClose}
-            className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="flex gap-2 overflow-x-auto border-b border-border px-3 py-3">
-          {conversations.length === 0 ? (
-            <p className="px-1 py-1 text-xs text-muted-foreground">No conversations yet.</p>
-          ) : null}
-          {conversations.map((thread) => (
-            <button
-              key={thread.id}
-              type="button"
-              onClick={() => setActiveId(thread.id)}
-              className={
-                thread.id === activeId
-                  ? "flex shrink-0 items-center gap-2 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
-                  : "flex shrink-0 items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-              }
-            >
-              {thread.otherName}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-          <p className="text-center text-xs text-muted-foreground">
-            Conversation with {activeName}
-          </p>
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={
-                message.sender_id === user?.id ? "flex justify-end" : "flex items-end gap-2"
-              }
-            >
-              {message.sender_id !== user?.id ? <Avatar name={activeName} size={28} /> : null}
-              <p
-                className={
-                  message.sender_id === user?.id
-                    ? "max-w-[75%] rounded-2xl rounded-br-sm bg-primary px-3.5 py-2 text-sm text-primary-foreground"
-                    : "max-w-[75%] rounded-2xl rounded-bl-sm bg-secondary px-3.5 py-2 text-sm text-secondary-foreground"
-                }
-              >
-                {message.body}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <form
-          className="flex items-center gap-2 border-t border-border p-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const text = draft.trim();
-            if (!text || !activeId) return;
-            sendMessage.mutate({ conversationId: activeId, body: text });
-            setDraft("");
-          }}
+        {/* Thread list */}
+        <div
+          className={
+            activeId
+              ? "hidden w-full shrink-0 flex-col border-r border-border sm:flex sm:w-72"
+              : "flex w-full shrink-0 flex-col border-r border-border sm:w-72"
+          }
         >
-          <input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder={`Message ${activeName}`}
-            disabled={!activeId}
-            className="w-full rounded-full bg-secondary px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground disabled:opacity-60"
-          />
-          <button
-            type="submit"
-            aria-label="Send message"
-            disabled={!activeId}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+          <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+            <MessageCircle className="h-5 w-5 text-primary" />
+            <p className="font-display text-base font-semibold">Chat</p>
+            <button
+              type="button"
+              aria-label="Close chat"
+              onClick={onClose}
+              className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <ul className="flex-1 overflow-y-auto">
+            {conversations.length === 0 ? (
+              <li className="px-4 py-6 text-center text-sm text-muted-foreground">
+                No conversations yet.
+              </li>
+            ) : null}
+            {conversations.map((thread) => (
+              <li key={thread.id}>
+                <button
+                  type="button"
+                  onClick={() => setActiveId(thread.id)}
+                  className={
+                    thread.id === activeId
+                      ? "flex w-full items-center gap-3 bg-secondary px-4 py-3 text-left"
+                      : "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-secondary/60"
+                  }
+                >
+                  <Avatar name={thread.otherName} size={38} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold leading-tight">
+                      {thread.otherName}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {thread.lastMessageBody ?? "No messages yet"}
+                    </p>
+                  </div>
+                  {thread.lastMessageAt ? (
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {timeAgo(thread.lastMessageAt)}
+                    </span>
+                  ) : null}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Active thread */}
+        <div className={activeId ? "flex w-full flex-col" : "hidden w-full flex-col sm:flex"}>
+          <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+            <button
+              type="button"
+              aria-label="Back to conversations"
+              onClick={() => setActiveId(null)}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:hidden"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            {activeId ? <Avatar name={activeName} size={30} /> : null}
+            <p className="truncate font-display text-base font-semibold">
+              {activeId ? activeName : "Select a conversation"}
+            </p>
+            {activeId ? (
+              <button
+                type="button"
+                aria-label="Start video call"
+                disabled={startingCall}
+                onClick={() => void startVideoCall()}
+                className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
+              >
+                <Video className="h-4 w-4" />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              aria-label="Close chat"
+              onClick={onClose}
+              className={
+                activeId
+                  ? "flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  : "ml-auto flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              }
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+            {messages.map((message) => {
+              const callUrl = message.body.startsWith("video-call::")
+                ? message.body.slice("video-call::".length)
+                : null;
+              return (
+                <div
+                  key={message.id}
+                  className={
+                    message.sender_id === user?.id ? "flex justify-end" : "flex items-end gap-2"
+                  }
+                >
+                  {message.sender_id !== user?.id ? <Avatar name={activeName} size={28} /> : null}
+                  {callUrl ? (
+                    <a
+                      href={callUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 rounded-2xl border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+                    >
+                      <Video className="h-4 w-4 text-primary" /> Join video call
+                    </a>
+                  ) : (
+                    <p
+                      className={
+                        message.sender_id === user?.id
+                          ? "max-w-[75%] rounded-2xl rounded-br-sm bg-primary px-3.5 py-2 text-sm text-primary-foreground"
+                          : "max-w-[75%] rounded-2xl rounded-bl-sm bg-secondary px-3.5 py-2 text-sm text-secondary-foreground"
+                      }
+                    >
+                      {message.body}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <form
+            className="flex items-center gap-2 border-t border-border p-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const text = draft.trim();
+              if (!text || !activeId) return;
+              sendMessage.mutate({ conversationId: activeId, body: text });
+              setDraft("");
+            }}
           >
-            <Send className="h-4 w-4" />
-          </button>
-        </form>
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder={`Message ${activeName}`}
+              disabled={!activeId}
+              className="w-full rounded-full bg-secondary px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground disabled:opacity-60"
+            />
+            <button
+              type="submit"
+              aria-label="Send message"
+              disabled={!activeId}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -464,6 +561,20 @@ export function Shell({ children }: { children: ReactNode }) {
                   </Link>
                 </li>
               ))}
+              {profile?.is_admin ? (
+                <li>
+                  <Link
+                    to="/admin"
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    activeProps={{
+                      className: "bg-primary text-primary-foreground hover:bg-primary/90",
+                    }}
+                  >
+                    <ShieldCheck className="h-5 w-5" />
+                    Admin
+                  </Link>
+                </li>
+              ) : null}
             </ul>
           </aside>
 

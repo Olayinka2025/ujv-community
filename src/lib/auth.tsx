@@ -9,7 +9,11 @@ type AuthValue = {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (name: string, email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (
+    name: string,
+    email: string,
+    password: string,
+  ) => Promise<{ error: string | null; needsConfirmation: boolean }>;
   signOut: () => Promise<void>;
 };
 
@@ -72,12 +76,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: error?.message ?? null };
     },
     async signUp(name, email, password) {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: { data: { name } },
       });
-      return { error: error?.message ?? null };
+      // Supabase returns no session (but no error either) when email
+      // confirmation is required — the account exists but isn't usable yet.
+      return { error: error?.message ?? null, needsConfirmation: !error && !data.session };
     },
     async signOut() {
       await supabase.auth.signOut();

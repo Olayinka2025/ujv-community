@@ -5,6 +5,7 @@ export type Profile = {
   role: string;
   location: string | null;
   created_at: string;
+  is_admin: boolean;
 };
 
 export type SpaceFeed = {
@@ -30,6 +31,7 @@ export type PostFeed = {
   author_role: string;
   like_count: number;
   liked_by_me: boolean;
+  comment_count: number;
 };
 
 export type EventFeed = {
@@ -84,4 +86,6 @@ export type ConversationSummary = {
   id: string;
   otherUserId: string;
   otherName: string;
+  lastMessageBody: string | null;
+  lastMessageAt: string | null;
 };

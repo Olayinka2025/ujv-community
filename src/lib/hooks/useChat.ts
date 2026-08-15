@@ -4,12 +4,12 @@ import { supabase } from "../supabase/client";
 import { useAuth } from "../auth";
 import type { ConversationSummary, Message } from "../types";
 
-type ConversationRow = {
+type ConversationFeedRow = {
   id: string;
-  user_a: string;
-  user_b: string;
-  a: { id: string; name: string } | null;
-  b: { id: string; name: string } | null;
+  other_user_id: string;
+  other_user_name: string;
+  last_message_body: string | null;
+  last_message_at: string | null;
 };
 
 export function useConversations() {
@@ -19,21 +19,18 @@ export function useConversations() {
     queryKey: ["conversations", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("conversations")
-        .select(
-          "id, user_a, user_b, a:profiles!conversations_user_a_fkey(id,name), b:profiles!conversations_user_b_fkey(id,name)",
-        )
-        .order("created_at", { ascending: false });
+        .from("conversation_feed")
+        .select("*")
+        .order("last_message_at", { ascending: false, nullsFirst: false });
       if (error) throw error;
 
-      return (data as unknown as ConversationRow[]).map((row): ConversationSummary => {
-        const other = row.user_a === user!.id ? row.b : row.a;
-        return {
-          id: row.id,
-          otherUserId: other?.id ?? "",
-          otherName: other?.name ?? "Member",
-        };
-      });
+      return (data as ConversationFeedRow[]).map((row): ConversationSummary => ({
+        id: row.id,
+        otherUserId: row.other_user_id,
+        otherName: row.other_user_name,
+        lastMessageBody: row.last_message_body,
+        lastMessageAt: row.last_message_at,
+      }));
     },
     enabled: Boolean(user),
   });
