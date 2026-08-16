@@ -256,16 +256,17 @@ function ChatPanel({
   };
 
   useEffect(() => {
-    if (!open) return;
-    if (guestUserId) {
-      const existing = conversations.find((thread) => thread.otherUserId === guestUserId);
-      if (existing) {
-        setActiveId(existing.id);
-      } else if (!orCreate.isPending) {
-        orCreate.mutate(guestUserId, { onSuccess: (id) => setActiveId(id) });
-      }
-    } else if (!activeId && conversations.length > 0) {
-      setActiveId(conversations[0]!.id);
+    if (!open || !guestUserId) return;
+    // Only auto-select when opened for a specific person (e.g. "Say hello").
+    // Opening chat generically should always land on the thread list — and
+    // must NOT reactively re-select a conversation on every background
+    // refetch of `conversations`, or it can silently yank the user back out
+    // of whatever thread they just tapped into.
+    const existing = conversations.find((thread) => thread.otherUserId === guestUserId);
+    if (existing) {
+      setActiveId(existing.id);
+    } else if (!orCreate.isPending) {
+      orCreate.mutate(guestUserId, { onSuccess: (id) => setActiveId(id) });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, guestUserId, conversations]);
