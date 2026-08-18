@@ -6,7 +6,6 @@ import { Logo } from "./Logo";
 import { useTheme } from "@/lib/client-prefs";
 import { useAuth } from "@/lib/auth";
 import { timeAgo } from "@/lib/format";
-import { createDailyRoom } from "@/lib/daily";
 import { useMembers } from "@/lib/hooks/useMembers";
 import { useSpaces } from "@/lib/hooks/useSpaces";
 import { useMarkNotificationsRead, useNotifications } from "@/lib/hooks/useNotifications";
@@ -246,8 +245,11 @@ function ChatPanel({
     if (!activeId || startingCall) return;
     setStartingCall(true);
     try {
-      const room = await createDailyRoom();
-      await sendMessage.mutateAsync({ conversationId: activeId, body: `video-call::${room.url}` });
+      // Jitsi's public server (meet.jit.si) needs no API call or account —
+      // a room is created lazily the moment someone opens its URL.
+      const roomName = `ujv-${crypto.randomUUID().replace(/-/g, "")}`;
+      const url = `https://meet.jit.si/${roomName}`;
+      await sendMessage.mutateAsync({ conversationId: activeId, body: `video-call::${url}` });
     } catch {
       toast.error("Couldn't start the video call.");
     } finally {

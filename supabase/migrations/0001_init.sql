@@ -411,7 +411,7 @@ select
   p.body,
   p.image_url,
   p.created_at,
-  p.space_slug,
+  p.space_slug,  
   s.name as space_name,
   p.author_id,
   pr.name as author_name,
