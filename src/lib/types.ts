@@ -89,3 +89,17 @@ export type ConversationSummary = {
   lastMessageBody: string | null;
   lastMessageAt: string | null;
 };
+
+export type CallStatus = "ringing" | "active" | "declined" | "ended" | "missed";
+
+export type Call = {
+  id: string;
+  conversationId: string;
+  callerId: string;
+  calleeId: string;
+  kind: "audio" | "video";
+  status: CallStatus;
+  roomName: string;
+  createdAt: string;
+  endedAt: string | null;
+};

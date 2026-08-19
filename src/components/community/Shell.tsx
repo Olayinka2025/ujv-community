@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { toast } from "sonner";
 import { Avatar } from "./Avatar";
 import { Logo } from "./Logo";
+import { CallOverlay } from "./CallOverlay";
 import { useTheme } from "@/lib/client-prefs";
 import { useAuth } from "@/lib/auth";
 import { timeAgo } from "@/lib/format";
@@ -15,6 +16,7 @@ import {
   useOrCreateConversation,
   useSendMessage,
 } from "@/lib/hooks/useChat";
+import { useStartCall } from "@/lib/hooks/useCalls";
 import {
   ArrowLeft,
   Bell,
@@ -23,6 +25,7 @@ import {
   LogOut,
   Megaphone,
   Moon,
+  Phone,
   Search,
   Send,
   Sun,
@@ -237,24 +240,21 @@ function ChatPanel({
   const { data: conversations = [] } = useConversations();
   const orCreate = useOrCreateConversation();
   const sendMessage = useSendMessage();
+  const startCall = useStartCall();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const [startingCall, setStartingCall] = useState(false);
 
-  const startVideoCall = async () => {
-    if (!activeId || startingCall) return;
-    setStartingCall(true);
-    try {
-      // Jitsi's public server (meet.jit.si) needs no API call or account —
-      // a room is created lazily the moment someone opens its URL.
-      const roomName = `ujv-${crypto.randomUUID().replace(/-/g, "")}`;
-      const url = `https://meet.jit.si/${roomName}`;
-      await sendMessage.mutateAsync({ conversationId: activeId, body: `video-call::${url}` });
-    } catch {
-      toast.error("Couldn't start the video call.");
-    } finally {
-      setStartingCall(false);
-    }
+  const activeConversation = conversations.find((thread) => thread.id === activeId);
+
+  const call = (kind: "audio" | "video") => {
+    if (!activeId || !activeConversation || startCall.isPending) return;
+    startCall.mutate(
+      { conversationId: activeId, calleeId: activeConversation.otherUserId, kind },
+      {
+        onError: () =>
+          toast.error(`Couldn't start the ${kind === "audio" ? "voice" : "video"} call.`),
+      },
+    );
   };
 
   useEffect(() => {
@@ -274,7 +274,6 @@ function ChatPanel({
   }, [open, guestUserId, conversations]);
 
   const { data: messages = [] } = useMessages(activeId);
-  const activeConversation = conversations.find((thread) => thread.id === activeId);
   const activeName = activeConversation?.otherName ?? guestName ?? "Conversation";
 
   if (!open) return null;
@@ -358,15 +357,26 @@ function ChatPanel({
               {activeId ? activeName : "Select a conversation"}
             </p>
             {activeId ? (
-              <button
-                type="button"
-                aria-label="Start video call"
-                disabled={startingCall}
-                onClick={() => void startVideoCall()}
-                className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
-              >
-                <Video className="h-4 w-4" />
-              </button>
+              <div className="ml-auto flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label="Start voice call"
+                  disabled={startCall.isPending}
+                  onClick={() => call("audio")}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                >
+                  <Phone className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Start video call"
+                  disabled={startCall.isPending}
+                  onClick={() => call("video")}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                >
+                  <Video className="h-4 w-4" />
+                </button>
+              </div>
             ) : null}
             <button
               type="button"
@@ -383,41 +393,25 @@ function ChatPanel({
           </div>
 
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-            {messages.map((message) => {
-              const callUrl = message.body.startsWith("video-call::")
-                ? message.body.slice("video-call::".length)
-                : null;
-              return (
-                <div
-                  key={message.id}
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={
+                  message.sender_id === user?.id ? "flex justify-end" : "flex items-end gap-2"
+                }
+              >
+                {message.sender_id !== user?.id ? <Avatar name={activeName} size={28} /> : null}
+                <p
                   className={
-                    message.sender_id === user?.id ? "flex justify-end" : "flex items-end gap-2"
+                    message.sender_id === user?.id
+                      ? "max-w-[75%] rounded-2xl rounded-br-sm bg-primary px-3.5 py-2 text-sm text-primary-foreground"
+                      : "max-w-[75%] rounded-2xl rounded-bl-sm bg-secondary px-3.5 py-2 text-sm text-secondary-foreground"
                   }
                 >
-                  {message.sender_id !== user?.id ? <Avatar name={activeName} size={28} /> : null}
-                  {callUrl ? (
-                    <a
-                      href={callUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-2 rounded-2xl border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
-                    >
-                      <Video className="h-4 w-4 text-primary" /> Join video call
-                    </a>
-                  ) : (
-                    <p
-                      className={
-                        message.sender_id === user?.id
-                          ? "max-w-[75%] rounded-2xl rounded-br-sm bg-primary px-3.5 py-2 text-sm text-primary-foreground"
-                          : "max-w-[75%] rounded-2xl rounded-bl-sm bg-secondary px-3.5 py-2 text-sm text-secondary-foreground"
-                      }
-                    >
-                      {message.body}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
+                  {message.body}
+                </p>
+              </div>
+            ))}
           </div>
 
           <form
@@ -614,6 +608,7 @@ export function Shell({ children }: { children: ReactNode }) {
           guestUserId={chatGuestId}
           guestName={chatGuestName}
         />
+        <CallOverlay />
       </div>
     </ShellContext.Provider>
   );
