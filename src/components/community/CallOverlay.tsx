@@ -1,33 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { LiveKitRoom, VideoConference } from "@livekit/components-react";
+import "@livekit/components-styles";
 import { Phone, PhoneOff, Video } from "lucide-react";
 import { Avatar } from "./Avatar";
 import { useAuth } from "@/lib/auth";
+import { createLiveKitToken } from "@/lib/livekit";
 import { useMyActiveCall, useRespondToCall, type ActiveCall } from "@/lib/hooks/useCalls";
-
-declare global {
-  interface Window {
-    JitsiMeetExternalAPI?: new (domain: string, options: Record<string, unknown>) => JitsiMeetAPI;
-  }
-}
-
-type JitsiMeetAPI = { dispose: () => void };
-
-let jitsiScriptPromise: Promise<void> | null = null;
-
-function loadJitsiScript(): Promise<void> {
-  if (window.JitsiMeetExternalAPI) return Promise.resolve();
-  if (!jitsiScriptPromise) {
-    jitsiScriptPromise = new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = "https://meet.jit.si/external_api.js";
-      script.async = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Failed to load Jitsi"));
-      document.head.appendChild(script);
-    });
-  }
-  return jitsiScriptPromise;
-}
 
 /** A couple of oscillator tones on a loop — no audio asset needed. */
 function useRingtone(playing: boolean) {
@@ -61,45 +39,43 @@ function useRingtone(playing: boolean) {
 }
 
 function ActiveCallView({ call, onHangUp }: { call: ActiveCall; onHangUp: () => void }) {
-  const { profile } = useAuth();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const apiRef = useRef<JitsiMeetAPI | null>(null);
+  const { user, profile } = useAuth();
+  const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void loadJitsiScript().then(() => {
-      if (cancelled || !containerRef.current || !window.JitsiMeetExternalAPI) return;
-      apiRef.current = new window.JitsiMeetExternalAPI("meet.jit.si", {
-        roomName: call.roomName,
-        parentNode: containerRef.current,
-        width: "100%",
-        height: "100%",
-        configOverwrite: {
-          startAudioOnly: call.kind === "audio",
-          prejoinPageEnabled: false,
-        },
-        userInfo: { displayName: profile?.name ?? "UJV member" },
-      });
+    if (!user) return;
+    void createLiveKitToken({
+      data: { roomName: call.roomName, identity: user.id, name: profile?.name ?? "UJV member" },
+    }).then((result) => {
+      if (!cancelled) setToken(result.token);
     });
     return () => {
       cancelled = true;
-      apiRef.current?.dispose();
-      apiRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [call.roomName, call.kind]);
+  }, [call.roomName, user, profile?.name]);
+
+  if (!token) {
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black text-sm text-white/70">
+        Connecting…
+      </div>
+    );
+  }
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-black">
-      <div ref={containerRef} className="min-h-0 flex-1" />
-      <button
-        type="button"
-        onClick={onHangUp}
-        aria-label="Hang up"
-        className="absolute bottom-6 left-1/2 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-lg transition-opacity hover:opacity-90"
+    <div className="fixed inset-0 z-[60] bg-black">
+      <LiveKitRoom
+        serverUrl={import.meta.env.VITE_LIVEKIT_URL}
+        token={token}
+        connect
+        audio
+        video={call.kind === "video"}
+        onDisconnected={onHangUp}
+        style={{ height: "100%" }}
       >
-        <PhoneOff className="h-6 w-6" />
-      </button>
+        <VideoConference />
+      </LiveKitRoom>
     </div>
   );
 }
