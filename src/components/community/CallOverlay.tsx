@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { LiveKitRoom, VideoConference } from "@livekit/components-react";
 import "@livekit/components-styles";
+import { DisconnectReason } from "livekit-client";
+import { toast } from "sonner";
 import { Phone, PhoneOff, Video } from "lucide-react";
 import { Avatar } from "./Avatar";
 import { useAuth } from "@/lib/auth";
@@ -73,7 +75,20 @@ function ActiveCallView({ call, onHangUp }: { call: ActiveCall; onHangUp: () => 
         connect
         audio
         video={call.kind === "video"}
-        onDisconnected={onHangUp}
+        onDisconnected={(reason) => {
+          const label = reason !== undefined ? DisconnectReason[reason] : "unknown";
+          console.error("[call] LiveKit disconnected, reason:", label, reason);
+          toast.error(`Call ended (${label})`);
+          onHangUp();
+        }}
+        onError={(error) => {
+          console.error("[call] LiveKit error:", error);
+          toast.error(`Call error: ${error.message}`);
+        }}
+        onMediaDeviceFailure={(failure, kind) => {
+          console.error("[call] Media device failure:", failure, kind);
+          toast.error(`Couldn't access ${kind ?? "device"}: ${failure ?? "unknown error"}`);
+        }}
         style={{ height: "100%" }}
       >
         <VideoConference />
