@@ -40,20 +40,22 @@ function useRingtone(playing: boolean) {
 
 function ActiveCallView({ call, onHangUp }: { call: ActiveCall; onHangUp: () => void }) {
   const { user, profile } = useAuth();
+  const userId = user?.id;
+  const displayName = profile?.name;
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    if (!user) return;
+    if (!userId) return;
     void createLiveKitToken({
-      data: { roomName: call.roomName, identity: user.id, name: profile?.name ?? "UJV member" },
+      data: { roomName: call.roomName, identity: userId, name: displayName ?? "UJV member" },
     }).then((result) => {
       if (!cancelled) setToken(result.token);
     });
     return () => {
       cancelled = true;
     };
-  }, [call.roomName, user, profile?.name]);
+  }, [call.roomName, userId, displayName]);
 
   if (!token) {
     return (
