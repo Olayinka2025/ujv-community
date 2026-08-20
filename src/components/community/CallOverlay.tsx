@@ -47,8 +47,15 @@ function ActiveCallView({ call, onHangUp }: { call: ActiveCall; onHangUp: () => 
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log("[call] ActiveCallView mounted, room:", call.roomName);
+    return () => console.log("[call] ActiveCallView UNMOUNTED, room:", call.roomName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     if (!userId) return;
+    console.log("[call] fetching token, deps:", { roomName: call.roomName, userId, displayName });
     void createLiveKitToken({
       data: { roomName: call.roomName, identity: userId, name: displayName ?? "UJV member" },
     }).then((result) => {
@@ -106,6 +113,8 @@ export function CallOverlay() {
   const isCaller = call?.callerId === user?.id;
   const isRinging = call?.status === "ringing";
   const otherName = call ? (isCaller ? call.calleeName : call.callerName) : "";
+
+  console.log("[call] CallOverlay render, status:", call?.status, "id:", call?.id);
 
   useRingtone(Boolean(call && isRinging));
 
